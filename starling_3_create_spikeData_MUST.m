@@ -35,7 +35,8 @@ if ~exist(spikeDataFolder, 'dir')
     mkdir(spikeDataFolder);
 end
 
-for pt = 6:length(microPts)
+for pt = 1:length(microPts)
+% for pt = 1:1
 
     ptID = microPts{pt};
     disp(ptID);
@@ -83,16 +84,47 @@ for pt = 6:length(microPts)
         double(NEV.Data.Spikes.TimeStamp)' ...
         ];
 
+    waveForms = NEV.Data.Spikes.Waveform;
+
     inclChans = unique(ChanUnitTimestamp(:,1));
 
-    microLabels = microLabelsSTARLING(ptID);
+    microLabelsOriginal = microLabelsSTARLING(ptID);
+
+    microLabels = cell(length(microLabelsOriginal) * 8, 1);
+    
+    idx = 1;
+    
+    for m = 1:length(microLabelsOriginal)
+    
+        for k = 1:8
+    
+            microLabels{idx} = microLabelsOriginal{m};
+            idx = idx + 1;
+    
+        end
+    
+    end
 
     if any(strcmp(ptID, difChanNumberPts))
-        inclChans(inclChans - 96 > length(microLabels) * 8) = [];
+        inclChans(inclChans - 96 > length(microLabelsOriginal) * 8) = [];
         nChans = length(inclChans);
     else
-        inclChans(inclChans - 192 > length(microLabels) * 8) = [];
+        inclChans(inclChans - 192 > length(microLabelsOriginal) * 8) = [];
         nChans = length(inclChans);
+    end
+
+    NumberOfUnits = zeros(size(inclChans));
+
+    for ch = 1:length(inclChans)
+
+        thisChan = inclChans(ch);
+
+        unitsThisChan = unique(ChanUnitTimestamp(ChanUnitTimestamp(:,1) == thisChan, 2));
+
+        unitsThisChan(unitsThisChan == 255) = [];
+
+        NumberOfUnits(ch) = length(unitsThisChan);
+
     end
 
     spikeData = struct();
@@ -103,8 +135,10 @@ for pt = 6:length(microPts)
     spikeData.inclChans = inclChans;
     spikeData.microLabels = microLabels;
     spikeData.nChans = nChans;
+    spikeData.NumberOfUnits = NumberOfUnits;
     spikeData.TimeRes = TimeRes;
     spikeData.nevFile = nevFile;
+    spikeData.WaveFroms = waveForms;
 
     saveFile = fullfile(spikeDataFolder, sprintf('%s_spikeData.mat', ptID));
 
