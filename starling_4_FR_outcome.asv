@@ -13,8 +13,8 @@ end
 
 windowBeforeSec = 1;
 windowAfterSec  = 2;
-binSizeSec = 0.05;
-smoothBins = 7;
+binSizeSec = 0.05;  
+smoothBins = 7;      
 
 timeEdges = -windowBeforeSec:binSizeSec:windowAfterSec;
 timeCenters = timeEdges(1:end-1) + binSizeSec/2;
@@ -23,8 +23,10 @@ baselineIdx = timeCenters >= -1 & timeCenters < 0;
 winColor  = [0 0.6 0];
 loseColor = [0.85 0 0];
 
-for pt = 1:length(microPts)
-% for pt = 1:1
+
+for pt = 1:1
+% for pt = 1:length(microPts)
+
     ptID = microPts{pt};
     fprintf('\nprocessing patient %s\n', ptID);
 
@@ -43,15 +45,9 @@ for pt = 1:length(microPts)
 
     winTrials  = find(outcome == "win");
     loseTrials = find(outcome == "lose");
-
-    allChanUnits = unique(ChanUnitTimestamp(:,1:2), 'rows');
-
-    % remove unit 255 = no waveform saved
-    allChanUnits(allChanUnits(:,2) == 255, :) = [];
-
-    % remove channels greater than the last channel in inclChans
-    maxInclChan = inclChans(end);
-    allChanUnits(allChanUnits(:,1) > maxInclChan, :) = [];
+    % 
+    % allChanUnits = unique(ChanUnitTimestamp(:,1:2), 'rows');
+    % allChanUnits(allChanUnits(:,2) == 255, :) = []; % removing the 255 unit that means no waveform happened here. 
 
     for cu = 1:size(allChanUnits, 1)
 
@@ -141,12 +137,11 @@ for pt = 1:length(microPts)
 
         end
 
-        if isempty(winTrialFR) && isempty(loseTrialFR)
+        allTrialFR = [winTrialFR; loseTrialFR];
+
+        if isempty(allTrialFR)
             continue
         end
-
-        % shared baseline normalization across win and lose
-        allTrialFR = [winTrialFR; loseTrialFR];
 
         baselineVals = allTrialFR(:, baselineIdx);
         baselineMean = mean(baselineVals(:), 'omitnan');
@@ -195,10 +190,8 @@ for pt = 1:length(microPts)
         xlim([-windowBeforeSec windowAfterSec])
         xlabel('Time from outcome onset (s)')
         ylabel('Trials')
-        title(sprintf('%s | %s | Ch %d Unit %d | Raster', ...
-            ptID, areaNameClean, chanNum, unitNum), ...
+        title(sprintf('%s | %s | Ch %d Unit %d | Raster', ptID, areaNameClean, chanNum, unitNum), ...
             'Interpreter', 'none')
-
         legend({'win', 'lose'}, 'Location', 'best')
         box off
 
@@ -213,11 +206,8 @@ for pt = 1:length(microPts)
             [loseMeanSmooth + loseSEMSmooth fliplr(loseMeanSmooth - loseSEMSmooth)], ...
             loseColor, 'FaceAlpha', 0.15, 'EdgeColor', 'none')
 
-        plot(timeCenters, winMeanSmooth, ...
-            'Color', winColor, 'LineWidth', 1.8)
-
-        plot(timeCenters, loseMeanSmooth, ...
-            'Color', loseColor, 'LineWidth', 1.8)
+        plot(timeCenters, winMeanSmooth, 'Color', winColor, 'LineWidth', 1.8)
+        plot(timeCenters, loseMeanSmooth, 'Color', loseColor, 'LineWidth', 1.8)
 
         xline(0, '--k')
         yline(0, ':k')
@@ -225,12 +215,11 @@ for pt = 1:length(microPts)
         xlim([-windowBeforeSec windowAfterSec])
         xlabel('Time from outcome onset (s)')
         ylabel('Baseline z-scored firing rate')
-        title('PSTH: mean ± SEM')
-        box off
+        title('PSTH: mean ± sem')
+        % legend({'win SEM', 'lose SEM', 'win mean', 'lose mean'}, 'Location', 'best')
+        % box off
 
-        pdfName = sprintf('%s_%s_ch%d_unit%d.pdf', ...
-            ptID, areaNameClean, chanNum, unitNum);
-
+        pdfName = sprintf('%s_%s_ch%d_unit%d.pdf', ptID, areaNameClean, chanNum, unitNum);
         pdfPath = fullfile(OutputFolder, pdfName);
 
         exportgraphics(fig, pdfPath, 'ContentType', 'vector');

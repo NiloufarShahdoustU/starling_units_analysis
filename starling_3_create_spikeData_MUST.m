@@ -21,7 +21,7 @@ clear;
 close all;
 
 microPts = {'202421', '202511', '202512', '202518', '202521', '202522', '202601'};
-difChanNumberPts = {'202421', '202511', '202512', '202518'};
+difChanNumberPts = {'202421', '202511', '202512'}; % older nidaq system
 
 outputFolderName = '\\155.100.91.44\d\Data\Nill\starling\spikes\';
 eventTimesFolder = '\\155.100.91.44\d\Data\Nill\starling\spikes\eventTimes';
