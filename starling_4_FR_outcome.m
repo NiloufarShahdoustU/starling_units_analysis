@@ -23,8 +23,8 @@ baselineIdx = timeCenters >= -1 & timeCenters < 0;
 winColor  = [0 0.6 0];
 loseColor = [0.85 0 0];
 
-for pt = 1:length(microPts)
-% for pt = 1:1
+% for pt = 1:length(microPts)
+for pt = 1:3
     ptID = microPts{pt};
     fprintf('\nprocessing patient %s\n', ptID);
 
@@ -223,9 +223,9 @@ for pt = 1:length(microPts)
         yline(0, ':k')
 
         xlim([-windowBeforeSec windowAfterSec])
-        xlabel('Time from outcome onset (s)')
-        ylabel('Baseline z-scored firing rate')
-        title('PSTH: mean ± SEM')
+        xlabel('time from outcome onset (s)')
+        ylabel('baseline z-scored firing rate')
+        title('PSTH: mean ± sem')
         box off
 
         pdfName = sprintf('%s_%s_ch%d_unit%d.pdf', ...
