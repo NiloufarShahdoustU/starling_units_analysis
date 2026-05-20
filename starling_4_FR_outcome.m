@@ -24,7 +24,7 @@ winColor  = [0 0.6 0];
 loseColor = [0.85 0 0];
 
 % for pt = 1:length(microPts)
-for pt = 1:3
+for pt = 1:1
     ptID = microPts{pt};
     fprintf('\nprocessing patient %s\n', ptID);
 
@@ -46,8 +46,7 @@ for pt = 1:3
 
     allChanUnits = unique(ChanUnitTimestamp(:,1:2), 'rows');
 
-    % remove unit 255 = no waveform saved
-    allChanUnits(allChanUnits(:,2) == 255, :) = [];
+
 
     % remove channels greater than the last channel in inclChans
     maxInclChan = inclChans(end);

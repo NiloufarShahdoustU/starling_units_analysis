@@ -36,7 +36,7 @@ if ~exist(spikeDataFolder, 'dir')
 end
 
 for pt = 1:length(microPts)
-% for pt = 1:1
+% for pt = 4:4
 
     ptID = microPts{pt};
     disp(ptID);
@@ -76,15 +76,40 @@ for pt = 1:length(microPts)
 
     NEV = openNEV(nevFile, 'overwrite');
 
-    TimeRes = NEV.MetaTags.TimeRes;
-
+    TimeRes   = NEV.MetaTags.TimeRes;
+    SampleRes = NEV.MetaTags.SampleRes;   % usually 30000
+    
+    [spikeTimestampSamples, timestampInfo] = convertBlackrockTimestamp( ...
+        NEV.Data.Spikes.TimeStamp, ...
+        TimeRes, ...
+        SampleRes);
+    
     ChanUnitTimestamp = [ ...
         double(NEV.Data.Spikes.Electrode)' ...
         double(NEV.Data.Spikes.Unit)' ...
-        double(NEV.Data.Spikes.TimeStamp)' ...
+        double(spikeTimestampSamples)' ...
         ];
 
     waveForms = NEV.Data.Spikes.Waveform;
+
+    % -------------------------------------------------------------
+    % Remove spikes where Unit == 255
+    % 255 means no waveform/unit was saved for that spike
+    % -------------------------------------------------------------
+    validSpikeMask = ChanUnitTimestamp(:, 2) ~= 255;
+
+    ChanUnitTimestamp = ChanUnitTimestamp(validSpikeMask, :);
+
+    % Also remove the matching waveforms so waveForms stays aligned
+    % with ChanUnitTimestamp.
+    if size(waveForms, 2) == length(validSpikeMask)
+        waveForms = waveForms(:, validSpikeMask);
+    elseif size(waveForms, 1) == length(validSpikeMask)
+        waveForms = waveForms(validSpikeMask, :);
+    else
+        warning('waveForms size does not match number of spikes. waveForms was not filtered.');
+    end
+    % -------------------------------------------------------------
 
     inclChans = unique(ChanUnitTimestamp(:,1));
 
@@ -121,6 +146,7 @@ for pt = 1:length(microPts)
 
         unitsThisChan = unique(ChanUnitTimestamp(ChanUnitTimestamp(:,1) == thisChan, 2));
 
+        % This line is now only a safety check, because 255 was already removed above.
         unitsThisChan(unitsThisChan == 255) = [];
 
         NumberOfUnits(ch) = length(unitsThisChan);
@@ -138,7 +164,7 @@ for pt = 1:length(microPts)
     spikeData.NumberOfUnits = NumberOfUnits;
     spikeData.TimeRes = TimeRes;
     spikeData.nevFile = nevFile;
-    spikeData.WaveFroms = waveForms;
+    spikeData.WaveForms = waveForms;
 
     saveFile = fullfile(spikeDataFolder, sprintf('%s_spikeData.mat', ptID));
 
