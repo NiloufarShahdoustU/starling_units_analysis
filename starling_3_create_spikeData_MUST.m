@@ -36,7 +36,7 @@ if ~exist(spikeDataFolder, 'dir')
 end
 
 for pt = 1:length(microPts)
-% for pt = 4:4
+% for pt = 7:7
 
     ptID = microPts{pt};
     disp(ptID);
@@ -62,7 +62,7 @@ for pt = 1:length(microPts)
 
     nevFolder = fullfile(baseFolder, folderNames{starlingIdx});
 
-    nevList = dir(fullfile(nevFolder, '*sortedNS*.nev'));
+    nevList = dir(fullfile(nevFolder, '*sortedNS.nev'));
 
     if length(nevList) > 1
         error('Many sortedNS nev files available for patient %s. Please specify...', ptID)
@@ -162,7 +162,7 @@ for pt = 1:length(microPts)
     spikeData.microLabels = microLabels;
     spikeData.nChans = nChans;
     spikeData.NumberOfUnits = NumberOfUnits;
-    spikeData.TimeRes = TimeRes;
+    spikeData.SampleRes = SampleRes;
     spikeData.nevFile = nevFile;
     spikeData.WaveForms = waveForms;
 
