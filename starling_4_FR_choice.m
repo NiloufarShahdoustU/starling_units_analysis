@@ -5,33 +5,27 @@ close all;
 microPts = {'202421', '202511', '202512', '202518', '202521', '202522', '202601'};
 
 inputFolder = '\\155.100.91.44\d\Data\Nill\starling\spikes\spike_data\';
-OutputFolder = '\\155.100.91.44\d\Code\Nill\Starling_units_analysis\starling_4_FR_outcome\';
+OutputFolder = '\\155.100.91.44\d\Code\Nill\Starling_units_analysis\starling_4_FR_choice\';
 
 if ~exist(OutputFolder, 'dir')
     mkdir(OutputFolder);
 end
 
-windowBeforeSec = 1;
-windowAfterSec  = 2;
+windowBeforeSec = 3;
+windowAfterSec  = 1;
 binSizeSec = 0.05;
 smoothBins = 7;
 
-% ===== fr filter =====
-minMeanFRHz = 0.5;              % fr: 0.5 spikes/second
-minFracTrialsWithSpikes = 0.10; % at least 10% of trials should have spikes
-% If you only want the 0.5 Hz rule, set this to 0:
-% minFracTrialsWithSpikes = 0;
-% ===============================
+minMeanFRHz = 0.5;
+minFracTrialsWithSpikes = 0.10;
 
-% ===== permutation test settings =====
-permWindowMs = 200;   % size of sliding window in ms
-permStrideMs = 50;    % stride size in ms
-nPerm = 1000;         % number of permutations
-alphaPerm = 0.05;     % significance threshold
+permWindowMs = 200;
+permStrideMs = 50;
+nPerm = 1000;
+alphaPerm = 0.05;
 
 permWindowSec = permWindowMs / 1000;
 permStrideSec = permStrideMs / 1000;
-% =====================================
 
 analysisWindowSec = windowBeforeSec + windowAfterSec;
 
@@ -39,8 +33,8 @@ timeEdges = -windowBeforeSec:binSizeSec:windowAfterSec;
 timeCenters = timeEdges(1:end-1) + binSizeSec/2;
 baselineIdx = timeCenters >= -1 & timeCenters < -.25;
 
-winColor  = [0 0.6 0];
-loseColor = [0.85 0 0];
+arrowUpColor   = [0 0.45 0.85];
+arrowDownColor = [0.85 0.35 0];
 
 for pt = 1:length(microPts)
 
@@ -56,21 +50,19 @@ for pt = 1:length(microPts)
     inclChans = spikeData.inclChans;
     microLabels = spikeData.microLabels;
 
-    outcomeTime = double(spikeData.eventTimes.choiceAndFeedbackTime);
-    SampleRes   = double(spikeData.SampleRes);
+    choiceTime = double(spikeData.eventTimes.choiceAndFeedbackTime);
+    SampleRes  = double(spikeData.SampleRes);
 
-    outcome = lower(string(bhvData.outcome));
+    choice = lower(string(bhvData.choice));
 
-    winTrials  = find(outcome == "win");
-    loseTrials = find(outcome == "lose");
+    arrowUpTrials   = find(choice == "arrowup");
+    arrowDownTrials = find(choice == "arrowdown");
 
     allChanUnits = unique(ChanUnitTimestamp(:,1:2), 'rows');
     allChanUnits = double(allChanUnits);
 
-    % remove unit 255 because it means no waveform was saved
     allChanUnits(allChanUnits(:,2) == 255, :) = [];
 
-    % remove channels greater than the maximum included channel
     maxInclChan = max(double(inclChans(:)));
     allChanUnits(allChanUnits(:,1) > maxInclChan, :) = [];
 
@@ -99,83 +91,83 @@ for pt = 1:length(microPts)
             continue
         end
 
-        winRasterX = [];
-        winRasterY = [];
-        loseRasterX = [];
-        loseRasterY = [];
+        arrowUpRasterX = [];
+        arrowUpRasterY = [];
+        arrowDownRasterX = [];
+        arrowDownRasterY = [];
 
-        winTrialFR = [];
-        loseTrialFR = [];
+        arrowUpTrialFR = [];
+        arrowDownTrialFR = [];
 
-        winTrialSpikeCounts = [];
-        loseTrialSpikeCounts = [];
+        arrowUpTrialSpikeCounts = [];
+        arrowDownTrialSpikeCounts = [];
 
-        validWinTrials = 0;
-        validLoseTrials = 0;
+        validArrowUpTrials = 0;
+        validArrowDownTrials = 0;
 
-        for i = 1:length(winTrials)
+        for i = 1:length(arrowUpTrials)
 
-            tr = winTrials(i);
+            tr = arrowUpTrials(i);
 
-            if tr > length(outcomeTime) || isnan(outcomeTime(tr))
+            if tr > length(choiceTime) || isnan(choiceTime(tr))
                 continue
             end
 
-            validWinTrials = validWinTrials + 1;
+            validArrowUpTrials = validArrowUpTrials + 1;
 
-            windowStart = outcomeTime(tr) - (windowBeforeSec * SampleRes);
-            windowEnd   = outcomeTime(tr) + (windowAfterSec  * SampleRes);
+            windowStart = choiceTime(tr) - (windowBeforeSec * SampleRes);
+            windowEnd   = choiceTime(tr) + (windowAfterSec  * SampleRes);
 
             spikesInWindow = unitSpikeTimes( ...
                 unitSpikeTimes >= windowStart & ...
                 unitSpikeTimes <= windowEnd);
 
-            relSpikesSec = (spikesInWindow - outcomeTime(tr)) ./ SampleRes;
+            relSpikesSec = (spikesInWindow - choiceTime(tr)) ./ SampleRes;
 
-            winRasterX = [winRasterX; relSpikesSec(:)];
-            winRasterY = [winRasterY; validWinTrials .* ones(length(relSpikesSec), 1)];
+            arrowUpRasterX = [arrowUpRasterX; relSpikesSec(:)];
+            arrowUpRasterY = [arrowUpRasterY; validArrowUpTrials .* ones(length(relSpikesSec), 1)];
 
             counts = histcounts(relSpikesSec, timeEdges);
 
-            winTrialFR(validWinTrials, :) = counts ./ binSizeSec;
-            winTrialSpikeCounts(validWinTrials, 1) = sum(counts);
+            arrowUpTrialFR(validArrowUpTrials, :) = counts ./ binSizeSec;
+            arrowUpTrialSpikeCounts(validArrowUpTrials, 1) = sum(counts);
 
         end
 
-        for i = 1:length(loseTrials)
+        for i = 1:length(arrowDownTrials)
 
-            tr = loseTrials(i);
+            tr = arrowDownTrials(i);
 
-            if tr > length(outcomeTime) || isnan(outcomeTime(tr))
+            if tr > length(choiceTime) || isnan(choiceTime(tr))
                 continue
             end
 
-            validLoseTrials = validLoseTrials + 1;
+            validArrowDownTrials = validArrowDownTrials + 1;
 
-            windowStart = outcomeTime(tr) - (windowBeforeSec * SampleRes);
-            windowEnd   = outcomeTime(tr) + (windowAfterSec  * SampleRes);
+            windowStart = choiceTime(tr) - (windowBeforeSec * SampleRes);
+            windowEnd   = choiceTime(tr) + (windowAfterSec  * SampleRes);
 
             spikesInWindow = unitSpikeTimes( ...
                 unitSpikeTimes >= windowStart & ...
                 unitSpikeTimes <= windowEnd);
 
-            relSpikesSec = (spikesInWindow - outcomeTime(tr)) ./ SampleRes;
+            relSpikesSec = (spikesInWindow - choiceTime(tr)) ./ SampleRes;
 
-            loseRasterX = [loseRasterX; relSpikesSec(:)];
-            loseRasterY = [loseRasterY; validLoseTrials .* ones(length(relSpikesSec), 1)];
+            arrowDownRasterX = [arrowDownRasterX; relSpikesSec(:)];
+            arrowDownRasterY = [arrowDownRasterY; validArrowDownTrials .* ones(length(relSpikesSec), 1)];
 
             counts = histcounts(relSpikesSec, timeEdges);
 
-            loseTrialFR(validLoseTrials, :) = counts ./ binSizeSec;
-            loseTrialSpikeCounts(validLoseTrials, 1) = sum(counts);
+            arrowDownTrialFR(validArrowDownTrials, :) = counts ./ binSizeSec;
+            arrowDownTrialSpikeCounts(validArrowDownTrials, 1) = sum(counts);
 
         end
 
-        if isempty(winTrialFR) && isempty(loseTrialFR)
+        if isempty(arrowUpTrialFR) && isempty(arrowDownTrialFR)
             continue
         end
 
-        allTrialSpikeCounts = [winTrialSpikeCounts; loseTrialSpikeCounts];
+        allTrialSpikeCounts = [arrowUpTrialSpikeCounts; arrowDownTrialSpikeCounts];
 
         nValidTrialsTotal = length(allTrialSpikeCounts);
         totalSpikesInWindow = sum(allTrialSpikeCounts);
@@ -188,8 +180,7 @@ for pt = 1:length(microPts)
             continue
         end
 
-        % shared baseline normalization across win and lose
-        allTrialFR = [winTrialFR; loseTrialFR];
+        allTrialFR = [arrowUpTrialFR; arrowDownTrialFR];
 
         baselineVals = allTrialFR(:, baselineIdx);
         baselineMean = mean(baselineVals(:), 'omitnan');
@@ -199,39 +190,33 @@ for pt = 1:length(microPts)
             baselineStd = 1;
         end
 
-        winZ  = (winTrialFR  - baselineMean) ./ baselineStd;
-        loseZ = (loseTrialFR - baselineMean) ./ baselineStd;
+        arrowUpZ   = (arrowUpTrialFR   - baselineMean) ./ baselineStd;
+        arrowDownZ = (arrowDownTrialFR - baselineMean) ./ baselineStd;
 
-        winMean  = mean(winZ, 1, 'omitnan');
-        loseMean = mean(loseZ, 1, 'omitnan');
+        arrowUpMean   = mean(arrowUpZ, 1, 'omitnan');
+        arrowDownMean = mean(arrowDownZ, 1, 'omitnan');
 
-        winSEM  = std(winZ, 0, 1, 'omitnan') ./ sqrt(size(winZ, 1));
-        loseSEM = std(loseZ, 0, 1, 'omitnan') ./ sqrt(size(loseZ, 1));
+        arrowUpSEM   = std(arrowUpZ, 0, 1, 'omitnan') ./ sqrt(size(arrowUpZ, 1));
+        arrowDownSEM = std(arrowDownZ, 0, 1, 'omitnan') ./ sqrt(size(arrowDownZ, 1));
 
-        winMeanSmooth  = smoothdata(winMean,  'gaussian', smoothBins);
-        loseMeanSmooth = smoothdata(loseMean, 'gaussian', smoothBins);
+        arrowUpMeanSmooth   = smoothdata(arrowUpMean,   'gaussian', smoothBins);
+        arrowDownMeanSmooth = smoothdata(arrowDownMean, 'gaussian', smoothBins);
 
-        winSEMSmooth  = smoothdata(winSEM,  'gaussian', smoothBins);
-        loseSEMSmooth = smoothdata(loseSEM, 'gaussian', smoothBins);
-
-        % ================================================================
-        % cluster-based sliding-window non-parametric permutation test
-        %
-        % This corrects for multiple comparisons across time windows.
-        % Significant windows are tested only AFTER outcome time.
-        % ================================================================
+        arrowUpSEMSmooth   = smoothdata(arrowUpSEM,   'gaussian', smoothBins);
+        arrowDownSEMSmooth = smoothdata(arrowDownSEM, 'gaussian', smoothBins);
 
         sigSegments = [];
 
-        if ~isempty(winZ) && ~isempty(loseZ)
+        if ~isempty(arrowUpZ) && ~isempty(arrowDownZ)
 
-            permStartTimes = 0:permStrideSec:(windowAfterSec - permWindowSec);
+            % ONLY test the -3 to 0 sec pre-choice window
+            permStartTimes = -windowBeforeSec:permStrideSec:(0 - permWindowSec);
             permEndTimes = permStartTimes + permWindowSec;
 
             nWindows = length(permStartTimes);
 
-            winWindowMat  = nan(size(winZ, 1), nWindows);
-            loseWindowMat = nan(size(loseZ, 1), nWindows);
+            arrowUpWindowMat   = nan(size(arrowUpZ, 1), nWindows);
+            arrowDownWindowMat = nan(size(arrowDownZ, 1), nWindows);
 
             for ww = 1:nWindows
 
@@ -244,23 +229,23 @@ for pt = 1:length(microPts)
                     continue
                 end
 
-                winWindowMat(:, ww)  = mean(winZ(:, thisIdx), 2, 'omitnan');
-                loseWindowMat(:, ww) = mean(loseZ(:, thisIdx), 2, 'omitnan');
+                arrowUpWindowMat(:, ww)   = mean(arrowUpZ(:, thisIdx), 2, 'omitnan');
+                arrowDownWindowMat(:, ww) = mean(arrowDownZ(:, thisIdx), 2, 'omitnan');
 
             end
 
             observedDiffs = nan(1, nWindows);
 
             for ww = 1:nWindows
-                observedDiffs(ww) = mean(winWindowMat(:, ww), 'omitnan') - ...
-                                    mean(loseWindowMat(:, ww), 'omitnan');
+                observedDiffs(ww) = mean(arrowUpWindowMat(:, ww), 'omitnan') - ...
+                                    mean(arrowDownWindowMat(:, ww), 'omitnan');
             end
 
-            allWindowMat = [winWindowMat; loseWindowMat];
+            allWindowMat = [arrowUpWindowMat; arrowDownWindowMat];
 
-            nWinHere  = size(winWindowMat, 1);
-            nLoseHere = size(loseWindowMat, 1);
-            nTotalHere = nWinHere + nLoseHere;
+            nArrowUpHere   = size(arrowUpWindowMat, 1);
+            nArrowDownHere = size(arrowDownWindowMat, 1);
+            nTotalHere = nArrowUpHere + nArrowDownHere;
 
             permDiffs = nan(nPerm, nWindows);
 
@@ -268,25 +253,23 @@ for pt = 1:length(microPts)
 
                 shuffledIdx = randperm(nTotalHere);
 
-                permWinIdx  = shuffledIdx(1:nWinHere);
-                permLoseIdx = shuffledIdx(nWinHere+1:end);
+                permArrowUpIdx   = shuffledIdx(1:nArrowUpHere);
+                permArrowDownIdx = shuffledIdx(nArrowUpHere+1:end);
 
-                permWinMat  = allWindowMat(permWinIdx, :);
-                permLoseMat = allWindowMat(permLoseIdx, :);
+                permArrowUpMat   = allWindowMat(permArrowUpIdx, :);
+                permArrowDownMat = allWindowMat(permArrowDownIdx, :);
 
                 for ww = 1:nWindows
-                    permDiffs(pp, ww) = mean(permWinMat(:, ww), 'omitnan') - ...
-                                        mean(permLoseMat(:, ww), 'omitnan');
+                    permDiffs(pp, ww) = mean(permArrowUpMat(:, ww), 'omitnan') - ...
+                                        mean(permArrowDownMat(:, ww), 'omitnan');
                 end
 
             end
 
-            % pointwise cluster-forming threshold
             permThresholds = prctile(abs(permDiffs), 100 * (1 - alphaPerm), 1);
 
             sigWindowIdx = abs(observedDiffs) > permThresholds;
 
-            % observed cluster masses
             observedClusterMasses = [];
             observedClusterStarts = [];
             observedClusterEnds = [];
@@ -316,7 +299,6 @@ for pt = 1:length(microPts)
 
             end
 
-            % null distribution of maximum cluster mass
             maxPermClusterMass = zeros(nPerm, 1);
 
             for pp = 1:nPerm
@@ -351,7 +333,6 @@ for pt = 1:length(microPts)
                 if ~isempty(permClusterMasses)
                     maxPermClusterMass(pp) = max(permClusterMasses);
                 end
-
             end
 
             for cc = 1:length(observedClusterMasses)
@@ -362,15 +343,13 @@ for pt = 1:length(microPts)
                 if clusterP < alphaPerm
                     sigSegments = [sigSegments; observedClusterStarts(cc) observedClusterEnds(cc)];
                 end
-
             end
-
-            % safety check: do not show anything before outcome time
+            % Keep ONLY significant clusters fully/partly in -3 to 0 sec
             if ~isempty(sigSegments)
-                sigSegments(sigSegments(:,2) <= 0, :) = [];
-                sigSegments(:,1) = max(sigSegments(:,1), 0);
+                sigSegments(sigSegments(:,1) >= 0, :) = [];
+                sigSegments(:,2) = min(sigSegments(:,2), 0);
+                sigSegments(:,1) = max(sigSegments(:,1), -windowBeforeSec);
             end
-
         end
 
         fig = figure('Visible', 'off', 'Color', 'w');
@@ -379,59 +358,54 @@ for pt = 1:length(microPts)
         subplot(2,1,1)
         hold on
 
-        scatter(winRasterX, winRasterY, 6, ...
+        scatter(arrowUpRasterX, arrowUpRasterY, 6, ...
             'filled', ...
-            'MarkerFaceColor', winColor, ...
+            'MarkerFaceColor', arrowUpColor, ...
             'MarkerEdgeColor', 'none', ...
             'MarkerFaceAlpha', 0.4)
 
-        scatter(loseRasterX, loseRasterY + validWinTrials, 6, ...
+        scatter(arrowDownRasterX, arrowDownRasterY + validArrowUpTrials, 6, ...
             'filled', ...
-            'MarkerFaceColor', loseColor, ...
+            'MarkerFaceColor', arrowDownColor, ...
             'MarkerEdgeColor', 'none', ...
             'MarkerFaceAlpha', 0.4)
 
         xline(0, '--k')
-        yline(validWinTrials + 0.5, '--k')
+        yline(validArrowUpTrials + 0.5, '--k')
 
         xlim([-windowBeforeSec windowAfterSec])
-        xlabel('time from outcome onset (s)')
+        xlabel('time from choice onset (s)')
         ylabel('trials')
 
         title(sprintf('%s | %s | Ch %d Unit %d | Raster | FR %.2f Hz', ...
             ptID, areaNameClean, chanNum, unitNum, meanFRHz), ...
             'Interpreter', 'none')
 
-        legend({'win', 'lose'}, 'Location', 'best')
+        legend({'arrowup', 'arrowdown'}, 'Location', 'best')
         box off
 
         subplot(2,1,2)
         hold on
 
         fill([timeCenters fliplr(timeCenters)], ...
-            [winMeanSmooth + winSEMSmooth fliplr(winMeanSmooth - winSEMSmooth)], ...
-            winColor, 'FaceAlpha', 0.15, 'EdgeColor', 'none')
+            [arrowUpMeanSmooth + arrowUpSEMSmooth fliplr(arrowUpMeanSmooth - arrowUpSEMSmooth)], ...
+            arrowUpColor, 'FaceAlpha', 0.15, 'EdgeColor', 'none')
 
         fill([timeCenters fliplr(timeCenters)], ...
-            [loseMeanSmooth + loseSEMSmooth fliplr(loseMeanSmooth - loseSEMSmooth)], ...
-            loseColor, 'FaceAlpha', 0.15, 'EdgeColor', 'none')
+            [arrowDownMeanSmooth + arrowDownSEMSmooth fliplr(arrowDownMeanSmooth - arrowDownSEMSmooth)], ...
+            arrowDownColor, 'FaceAlpha', 0.15, 'EdgeColor', 'none')
 
-        plot(timeCenters, winMeanSmooth, ...
-            'Color', winColor, 'LineWidth', 1.8)
+        plot(timeCenters, arrowUpMeanSmooth, ...
+            'Color', arrowUpColor, 'LineWidth', 1.8)
 
-        plot(timeCenters, loseMeanSmooth, ...
-            'Color', loseColor, 'LineWidth', 1.8)
+        plot(timeCenters, arrowDownMeanSmooth, ...
+            'Color', arrowDownColor, 'LineWidth', 1.8)
 
         xline(0, '--k')
         yline(0, ':k')
 
-        % ================================================================
-        % add gray horizontal line above significant parts
-        % with vertical time labels at the beginning and ending
-        % ================================================================
-
-        upperVals = [winMeanSmooth + winSEMSmooth, loseMeanSmooth + loseSEMSmooth];
-        lowerVals = [winMeanSmooth - winSEMSmooth, loseMeanSmooth - loseSEMSmooth];
+        upperVals = [arrowUpMeanSmooth + arrowUpSEMSmooth, arrowDownMeanSmooth + arrowDownSEMSmooth];
+        lowerVals = [arrowUpMeanSmooth - arrowUpSEMSmooth, arrowDownMeanSmooth - arrowDownSEMSmooth];
 
         curveHigh = max(upperVals, [], 'omitnan');
         curveLow  = min(lowerVals, [], 'omitnan');
@@ -453,31 +427,30 @@ for pt = 1:length(microPts)
         sigY = curveHigh + 0.15 * yRange;
 
         for ss = 1:size(sigSegments, 1)
-        
+
             sigStart = sigSegments(ss, 1);
             sigEnd   = sigSegments(ss, 2);
-        
+
             plot([sigStart sigEnd], [sigY sigY], ...
                 '-', ...
                 'Color', [0.5 0.5 0.5], ...
                 'LineWidth', 4)
-        
-            labelY = sigY + 0.04 * yRange;   % a little above the gray line
-        
+
+            labelY = sigY + 0.04 * yRange;
+
             text(sigStart, labelY, sprintf('%.0f ms', sigStart * 1000), ...
                 'Color', [0.35 0.35 0.35], ...
                 'FontSize', 8, ...
                 'Rotation', 90, ...
                 'HorizontalAlignment', 'left', ...
                 'VerticalAlignment', 'middle')
-        
+
             text(sigEnd, labelY, sprintf('%.0f ms', sigEnd * 1000), ...
                 'Color', [0.35 0.35 0.35], ...
                 'FontSize', 8, ...
                 'Rotation', 90, ...
                 'HorizontalAlignment', 'left', ...
                 'VerticalAlignment', 'middle')
-        
         end
 
         if ~isempty(sigSegments)
@@ -485,12 +458,12 @@ for pt = 1:length(microPts)
         end
 
         xlim([-windowBeforeSec windowAfterSec])
-        xlabel('time from outcome onset (s)')
+        xlabel('time from choice onset (s)')
         ylabel('baseline z-scored firing rate')
         title('PSTH: mean ± sem');
         box off
 
-        pdfName = sprintf('%s_%s_ch%d_unit%d.pdf', ...
+        pdfName = sprintf('%s_%s_ch%d_unit%d_choice.pdf', ...
             ptID, areaNameClean, chanNum, unitNum);
 
         pdfPath = fullfile(OutputFolder, pdfName);

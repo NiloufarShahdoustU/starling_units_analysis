@@ -5,39 +5,35 @@ close all;
 microPts = {'202421', '202511', '202512', '202518', '202521', '202522', '202601'};
 
 inputFolder = '\\155.100.91.44\d\Data\Nill\starling\spikes\spike_data\';
-OutputFolder = '\\155.100.91.44\d\Code\Nill\Starling_units_analysis\starling_4_FR_outcome\';
+OutputFolder = '\\155.100.91.44\d\Code\Nill\Starling_units_analysis\starling_4_FR_total_reward\';
 
 if ~exist(OutputFolder, 'dir')
     mkdir(OutputFolder);
 end
 
+% Extract -1 to +1 so baseline normalization is possible.
+% Visualization and statistics are ONLY 0 to +1 sec.
 windowBeforeSec = 1;
-windowAfterSec  = 2;
+windowAfterSec  = 1;
 binSizeSec = 0.05;
 smoothBins = 7;
 
-% ===== fr filter =====
-minMeanFRHz = 0.5;              % fr: 0.5 spikes/second
-minFracTrialsWithSpikes = 0.10; % at least 10% of trials should have spikes
-% If you only want the 0.5 Hz rule, set this to 0:
-% minFracTrialsWithSpikes = 0;
-% ===============================
+minMeanFRHz = 0.5;
+minFracTrialsWithSpikes = 0.10;
 
-% ===== permutation test settings =====
-permWindowMs = 200;   % size of sliding window in ms
-permStrideMs = 50;    % stride size in ms
-nPerm = 1000;         % number of permutations
-alphaPerm = 0.05;     % significance threshold
-
-permWindowSec = permWindowMs / 1000;
-permStrideSec = permStrideMs / 1000;
-% =====================================
+nPerm = 1000;
+alphaPerm = 0.05;
+clusterFormingAlpha = 0.05;
 
 analysisWindowSec = windowBeforeSec + windowAfterSec;
 
 timeEdges = -windowBeforeSec:binSizeSec:windowAfterSec;
 timeCenters = timeEdges(1:end-1) + binSizeSec/2;
-baselineIdx = timeCenters >= -1 & timeCenters < -.25;
+
+baselineIdx = timeCenters >= -1 & timeCenters < -0.25;
+testIdx = timeCenters >= 0 & timeCenters <= windowAfterSec;
+
+testTimeCenters = timeCenters(testIdx);
 
 winColor  = [0 0.6 0];
 loseColor = [0.85 0 0];
@@ -56,8 +52,19 @@ for pt = 1:length(microPts)
     inclChans = spikeData.inclChans;
     microLabels = spikeData.microLabels;
 
-    outcomeTime = double(spikeData.eventTimes.choiceAndFeedbackTime);
-    SampleRes   = double(spikeData.SampleRes);
+    if isfield(eventTime, 'totalRewardTime')
+        totalRewardTime = double(eventTime.totalRewardTime);
+    elseif isfield(eventTime, 'totalReward')
+        totalRewardTime = double(eventTime.totalReward);
+    elseif isfield(eventTime, 'totalRewardShowTime')
+        totalRewardTime = double(eventTime.totalRewardShowTime);
+    elseif isfield(eventTime, 'totalRewardOnsetTime')
+        totalRewardTime = double(eventTime.totalRewardOnsetTime);
+    else
+        error('Could not find total reward time field in spikeData.eventTimes');
+    end
+
+    SampleRes = double(spikeData.SampleRes);
 
     outcome = lower(string(bhvData.outcome));
 
@@ -67,10 +74,8 @@ for pt = 1:length(microPts)
     allChanUnits = unique(ChanUnitTimestamp(:,1:2), 'rows');
     allChanUnits = double(allChanUnits);
 
-    % remove unit 255 because it means no waveform was saved
     allChanUnits(allChanUnits(:,2) == 255, :) = [];
 
-    % remove channels greater than the maximum included channel
     maxInclChan = max(double(inclChans(:)));
     allChanUnits(allChanUnits(:,1) > maxInclChan, :) = [];
 
@@ -117,20 +122,20 @@ for pt = 1:length(microPts)
 
             tr = winTrials(i);
 
-            if tr > length(outcomeTime) || isnan(outcomeTime(tr))
+            if tr > length(totalRewardTime) || isnan(totalRewardTime(tr))
                 continue
             end
 
             validWinTrials = validWinTrials + 1;
 
-            windowStart = outcomeTime(tr) - (windowBeforeSec * SampleRes);
-            windowEnd   = outcomeTime(tr) + (windowAfterSec  * SampleRes);
+            windowStart = totalRewardTime(tr) - windowBeforeSec * SampleRes;
+            windowEnd   = totalRewardTime(tr) + windowAfterSec  * SampleRes;
 
             spikesInWindow = unitSpikeTimes( ...
                 unitSpikeTimes >= windowStart & ...
                 unitSpikeTimes <= windowEnd);
 
-            relSpikesSec = (spikesInWindow - outcomeTime(tr)) ./ SampleRes;
+            relSpikesSec = (spikesInWindow - totalRewardTime(tr)) ./ SampleRes;
 
             winRasterX = [winRasterX; relSpikesSec(:)];
             winRasterY = [winRasterY; validWinTrials .* ones(length(relSpikesSec), 1)];
@@ -146,20 +151,20 @@ for pt = 1:length(microPts)
 
             tr = loseTrials(i);
 
-            if tr > length(outcomeTime) || isnan(outcomeTime(tr))
+            if tr > length(totalRewardTime) || isnan(totalRewardTime(tr))
                 continue
             end
 
             validLoseTrials = validLoseTrials + 1;
 
-            windowStart = outcomeTime(tr) - (windowBeforeSec * SampleRes);
-            windowEnd   = outcomeTime(tr) + (windowAfterSec  * SampleRes);
+            windowStart = totalRewardTime(tr) - windowBeforeSec * SampleRes;
+            windowEnd   = totalRewardTime(tr) + windowAfterSec  * SampleRes;
 
             spikesInWindow = unitSpikeTimes( ...
                 unitSpikeTimes >= windowStart & ...
                 unitSpikeTimes <= windowEnd);
 
-            relSpikesSec = (spikesInWindow - outcomeTime(tr)) ./ SampleRes;
+            relSpikesSec = (spikesInWindow - totalRewardTime(tr)) ./ SampleRes;
 
             loseRasterX = [loseRasterX; relSpikesSec(:)];
             loseRasterY = [loseRasterY; validLoseTrials .* ones(length(relSpikesSec), 1)];
@@ -171,7 +176,7 @@ for pt = 1:length(microPts)
 
         end
 
-        if isempty(winTrialFR) && isempty(loseTrialFR)
+        if isempty(winTrialFR) || isempty(loseTrialFR)
             continue
         end
 
@@ -188,7 +193,10 @@ for pt = 1:length(microPts)
             continue
         end
 
-        % shared baseline normalization across win and lose
+        % ================================================================
+        % Shared baseline normalization across win and lose
+        % baseline = -1 to -0.25 sec before total reward
+        % ================================================================
         allTrialFR = [winTrialFR; loseTrialFR];
 
         baselineVals = allTrialFR(:, baselineIdx);
@@ -215,163 +223,182 @@ for pt = 1:length(microPts)
         loseSEMSmooth = smoothdata(loseSEM, 'gaussian', smoothBins);
 
         % ================================================================
-        % cluster-based sliding-window non-parametric permutation test
-        %
-        % This corrects for multiple comparisons across time windows.
-        % Significant windows are tested only AFTER outcome time.
+        % Non-parametric cluster-based permutation test
+        % win vs lose, ONLY 0 to +1 sec
+        % Uses ranksum per time bin.
+        % Cluster mass = sum(abs(z-values)) inside contiguous significant bins.
+        % Correction = compare observed cluster mass to max permuted cluster mass.
         % ================================================================
 
         sigSegments = [];
 
-        if ~isempty(winZ) && ~isempty(loseZ)
+        winTestZ  = winZ(:, testIdx);
+        loseTestZ = loseZ(:, testIdx);
 
-            permStartTimes = 0:permStrideSec:(windowAfterSec - permWindowSec);
-            permEndTimes = permStartTimes + permWindowSec;
+        nTestBins = size(winTestZ, 2);
 
-            nWindows = length(permStartTimes);
+        observedP = nan(1, nTestBins);
+        observedZ = nan(1, nTestBins);
 
-            winWindowMat  = nan(size(winZ, 1), nWindows);
-            loseWindowMat = nan(size(loseZ, 1), nWindows);
+        for bb = 1:nTestBins
 
-            for ww = 1:nWindows
+            x = winTestZ(:, bb);
+            y = loseTestZ(:, bb);
 
-                thisStart = permStartTimes(ww);
-                thisEnd   = permEndTimes(ww);
+            x = x(~isnan(x));
+            y = y(~isnan(y));
 
-                thisIdx = timeCenters >= thisStart & timeCenters < thisEnd;
-
-                if sum(thisIdx) < 1
-                    continue
-                end
-
-                winWindowMat(:, ww)  = mean(winZ(:, thisIdx), 2, 'omitnan');
-                loseWindowMat(:, ww) = mean(loseZ(:, thisIdx), 2, 'omitnan');
-
+            if length(x) < 2 || length(y) < 2
+                continue
             end
 
-            observedDiffs = nan(1, nWindows);
+            [pVal, ~, stats] = ranksum(x, y);
 
-            for ww = 1:nWindows
-                observedDiffs(ww) = mean(winWindowMat(:, ww), 'omitnan') - ...
-                                    mean(loseWindowMat(:, ww), 'omitnan');
-            end
+            observedP(bb) = pVal;
 
-            allWindowMat = [winWindowMat; loseWindowMat];
-
-            nWinHere  = size(winWindowMat, 1);
-            nLoseHere = size(loseWindowMat, 1);
-            nTotalHere = nWinHere + nLoseHere;
-
-            permDiffs = nan(nPerm, nWindows);
-
-            for pp = 1:nPerm
-
-                shuffledIdx = randperm(nTotalHere);
-
-                permWinIdx  = shuffledIdx(1:nWinHere);
-                permLoseIdx = shuffledIdx(nWinHere+1:end);
-
-                permWinMat  = allWindowMat(permWinIdx, :);
-                permLoseMat = allWindowMat(permLoseIdx, :);
-
-                for ww = 1:nWindows
-                    permDiffs(pp, ww) = mean(permWinMat(:, ww), 'omitnan') - ...
-                                        mean(permLoseMat(:, ww), 'omitnan');
-                end
-
-            end
-
-            % pointwise cluster-forming threshold
-            permThresholds = prctile(abs(permDiffs), 100 * (1 - alphaPerm), 1);
-
-            sigWindowIdx = abs(observedDiffs) > permThresholds;
-
-            % observed cluster masses
-            observedClusterMasses = [];
-            observedClusterStarts = [];
-            observedClusterEnds = [];
-
-            ww = 1;
-            while ww <= nWindows
-
-                if sigWindowIdx(ww)
-
-                    clusterStartIdx = ww;
-
-                    while ww <= nWindows && sigWindowIdx(ww)
-                        ww = ww + 1;
-                    end
-
-                    clusterEndIdx = ww - 1;
-
-                    clusterMass = sum(abs(observedDiffs(clusterStartIdx:clusterEndIdx)), 'omitnan');
-
-                    observedClusterMasses = [observedClusterMasses; clusterMass];
-                    observedClusterStarts = [observedClusterStarts; permStartTimes(clusterStartIdx)];
-                    observedClusterEnds   = [observedClusterEnds; permEndTimes(clusterEndIdx)];
-
-                else
-                    ww = ww + 1;
-                end
-
-            end
-
-            % null distribution of maximum cluster mass
-            maxPermClusterMass = zeros(nPerm, 1);
-
-            for pp = 1:nPerm
-
-                permSigWindowIdx = abs(permDiffs(pp, :)) > permThresholds;
-
-                permClusterMasses = [];
-
-                ww = 1;
-                while ww <= nWindows
-
-                    if permSigWindowIdx(ww)
-
-                        clusterStartIdx = ww;
-
-                        while ww <= nWindows && permSigWindowIdx(ww)
-                            ww = ww + 1;
-                        end
-
-                        clusterEndIdx = ww - 1;
-
-                        clusterMass = sum(abs(permDiffs(pp, clusterStartIdx:clusterEndIdx)), 'omitnan');
-
-                        permClusterMasses = [permClusterMasses; clusterMass];
-
-                    else
-                        ww = ww + 1;
-                    end
-
-                end
-
-                if ~isempty(permClusterMasses)
-                    maxPermClusterMass(pp) = max(permClusterMasses);
-                end
-
-            end
-
-            for cc = 1:length(observedClusterMasses)
-
-                clusterP = (sum(maxPermClusterMass >= observedClusterMasses(cc)) + 1) / ...
-                           (nPerm + 1);
-
-                if clusterP < alphaPerm
-                    sigSegments = [sigSegments; observedClusterStarts(cc) observedClusterEnds(cc)];
-                end
-
-            end
-
-            % safety check: do not show anything before outcome time
-            if ~isempty(sigSegments)
-                sigSegments(sigSegments(:,2) <= 0, :) = [];
-                sigSegments(:,1) = max(sigSegments(:,1), 0);
+            if isfield(stats, 'zval')
+                observedZ(bb) = stats.zval;
+            else
+                observedZ(bb) = 0;
             end
 
         end
+
+        observedSigBins = observedP < clusterFormingAlpha;
+
+        observedClusterMasses = [];
+        observedClusterStarts = [];
+        observedClusterEnds = [];
+
+        bb = 1;
+        while bb <= nTestBins
+
+            if observedSigBins(bb)
+
+                clusterStartIdx = bb;
+
+                while bb <= nTestBins && observedSigBins(bb)
+                    bb = bb + 1;
+                end
+
+                clusterEndIdx = bb - 1;
+
+                clusterMass = sum(abs(observedZ(clusterStartIdx:clusterEndIdx)), 'omitnan');
+
+                observedClusterMasses = [observedClusterMasses; clusterMass];
+                observedClusterStarts = [observedClusterStarts; testTimeCenters(clusterStartIdx) - binSizeSec/2];
+                observedClusterEnds   = [observedClusterEnds;   testTimeCenters(clusterEndIdx)   + binSizeSec/2];
+
+            else
+                bb = bb + 1;
+            end
+
+        end
+
+        allTestZ = [winTestZ; loseTestZ];
+
+        nWinHere = size(winTestZ, 1);
+        nLoseHere = size(loseTestZ, 1);
+        nTotalHere = nWinHere + nLoseHere;
+
+        maxPermClusterMass = zeros(nPerm, 1);
+
+        for pp = 1:nPerm
+
+            shuffledIdx = randperm(nTotalHere);
+
+            permWinIdx  = shuffledIdx(1:nWinHere);
+            permLoseIdx = shuffledIdx(nWinHere+1:end);
+
+            permWinZ  = allTestZ(permWinIdx, :);
+            permLoseZ = allTestZ(permLoseIdx, :);
+
+            permP = nan(1, nTestBins);
+            permZ = nan(1, nTestBins);
+
+            for bb = 1:nTestBins
+
+                x = permWinZ(:, bb);
+                y = permLoseZ(:, bb);
+
+                x = x(~isnan(x));
+                y = y(~isnan(y));
+
+                if length(x) < 2 || length(y) < 2
+                    continue
+                end
+
+                [pVal, ~, stats] = ranksum(x, y);
+
+                permP(bb) = pVal;
+
+                if isfield(stats, 'zval')
+                    permZ(bb) = stats.zval;
+                else
+                    permZ(bb) = 0;
+                end
+
+            end
+
+            permSigBins = permP < clusterFormingAlpha;
+
+            permClusterMasses = [];
+
+            bb = 1;
+            while bb <= nTestBins
+
+                if permSigBins(bb)
+
+                    clusterStartIdx = bb;
+
+                    while bb <= nTestBins && permSigBins(bb)
+                        bb = bb + 1;
+                    end
+
+                    clusterEndIdx = bb - 1;
+
+                    clusterMass = sum(abs(permZ(clusterStartIdx:clusterEndIdx)), 'omitnan');
+
+                    permClusterMasses = [permClusterMasses; clusterMass];
+
+                else
+                    bb = bb + 1;
+                end
+
+            end
+
+            if ~isempty(permClusterMasses)
+                maxPermClusterMass(pp) = max(permClusterMasses);
+            else
+                maxPermClusterMass(pp) = 0;
+            end
+
+        end
+
+        clusterPvals = [];
+
+        for cc = 1:length(observedClusterMasses)
+
+            clusterP = (sum(maxPermClusterMass >= observedClusterMasses(cc)) + 1) / ...
+                       (nPerm + 1);
+
+            clusterPvals = [clusterPvals; clusterP];
+
+            if clusterP < alphaPerm
+                sigSegments = [sigSegments; observedClusterStarts(cc) observedClusterEnds(cc)];
+            end
+
+        end
+
+        if ~isempty(sigSegments)
+            sigSegments(sigSegments(:,2) <= 0, :) = [];
+            sigSegments(:,1) = max(sigSegments(:,1), 0);
+            sigSegments(:,2) = min(sigSegments(:,2), windowAfterSec);
+        end
+
+        % ================================================================
+        % Plot
+        % ================================================================
 
         fig = figure('Visible', 'off', 'Color', 'w');
         set(fig, 'Position', [100 100 900 700]);
@@ -394,8 +421,8 @@ for pt = 1:length(microPts)
         xline(0, '--k')
         yline(validWinTrials + 0.5, '--k')
 
-        xlim([-windowBeforeSec windowAfterSec])
-        xlabel('time from outcome onset (s)')
+        xlim([0 windowAfterSec])
+        xlabel('time from total reward onset (s)')
         ylabel('trials')
 
         title(sprintf('%s | %s | Ch %d Unit %d | Raster | FR %.2f Hz', ...
@@ -408,30 +435,32 @@ for pt = 1:length(microPts)
         subplot(2,1,2)
         hold on
 
-        fill([timeCenters fliplr(timeCenters)], ...
-            [winMeanSmooth + winSEMSmooth fliplr(winMeanSmooth - winSEMSmooth)], ...
+        plotIdx = timeCenters >= 0 & timeCenters <= windowAfterSec;
+
+        fill([timeCenters(plotIdx) fliplr(timeCenters(plotIdx))], ...
+            [winMeanSmooth(plotIdx) + winSEMSmooth(plotIdx), ...
+             fliplr(winMeanSmooth(plotIdx) - winSEMSmooth(plotIdx))], ...
             winColor, 'FaceAlpha', 0.15, 'EdgeColor', 'none')
 
-        fill([timeCenters fliplr(timeCenters)], ...
-            [loseMeanSmooth + loseSEMSmooth fliplr(loseMeanSmooth - loseSEMSmooth)], ...
+        fill([timeCenters(plotIdx) fliplr(timeCenters(plotIdx))], ...
+            [loseMeanSmooth(plotIdx) + loseSEMSmooth(plotIdx), ...
+             fliplr(loseMeanSmooth(plotIdx) - loseSEMSmooth(plotIdx))], ...
             loseColor, 'FaceAlpha', 0.15, 'EdgeColor', 'none')
 
-        plot(timeCenters, winMeanSmooth, ...
+        plot(timeCenters(plotIdx), winMeanSmooth(plotIdx), ...
             'Color', winColor, 'LineWidth', 1.8)
 
-        plot(timeCenters, loseMeanSmooth, ...
+        plot(timeCenters(plotIdx), loseMeanSmooth(plotIdx), ...
             'Color', loseColor, 'LineWidth', 1.8)
 
         xline(0, '--k')
         yline(0, ':k')
 
-        % ================================================================
-        % add gray horizontal line above significant parts
-        % with vertical time labels at the beginning and ending
-        % ================================================================
+        upperVals = [winMeanSmooth(plotIdx) + winSEMSmooth(plotIdx), ...
+                     loseMeanSmooth(plotIdx) + loseSEMSmooth(plotIdx)];
 
-        upperVals = [winMeanSmooth + winSEMSmooth, loseMeanSmooth + loseSEMSmooth];
-        lowerVals = [winMeanSmooth - winSEMSmooth, loseMeanSmooth - loseSEMSmooth];
+        lowerVals = [winMeanSmooth(plotIdx) - winSEMSmooth(plotIdx), ...
+                     loseMeanSmooth(plotIdx) - loseSEMSmooth(plotIdx)];
 
         curveHigh = max(upperVals, [], 'omitnan');
         curveLow  = min(lowerVals, [], 'omitnan');
@@ -453,44 +482,46 @@ for pt = 1:length(microPts)
         sigY = curveHigh + 0.15 * yRange;
 
         for ss = 1:size(sigSegments, 1)
-        
+
             sigStart = sigSegments(ss, 1);
             sigEnd   = sigSegments(ss, 2);
-        
+
             plot([sigStart sigEnd], [sigY sigY], ...
                 '-', ...
                 'Color', [0.5 0.5 0.5], ...
                 'LineWidth', 4)
-        
-            labelY = sigY + 0.04 * yRange;   % a little above the gray line
-        
+
+            labelY = sigY + 0.04 * yRange;
+
             text(sigStart, labelY, sprintf('%.0f ms', sigStart * 1000), ...
                 'Color', [0.35 0.35 0.35], ...
                 'FontSize', 8, ...
                 'Rotation', 90, ...
                 'HorizontalAlignment', 'left', ...
                 'VerticalAlignment', 'middle')
-        
+
             text(sigEnd, labelY, sprintf('%.0f ms', sigEnd * 1000), ...
                 'Color', [0.35 0.35 0.35], ...
                 'FontSize', 8, ...
                 'Rotation', 90, ...
                 'HorizontalAlignment', 'left', ...
                 'VerticalAlignment', 'middle')
-        
+
         end
 
         if ~isempty(sigSegments)
             ylim([curveLow - 0.15 * yRange, sigY + 0.55 * yRange])
+        else
+            ylim([curveLow - 0.15 * yRange, curveHigh + 0.25 * yRange])
         end
 
-        xlim([-windowBeforeSec windowAfterSec])
-        xlabel('time from outcome onset (s)')
+        xlim([0 windowAfterSec])
+        xlabel('time from total reward onset (s)')
         ylabel('baseline z-scored firing rate')
-        title('PSTH: mean ± sem');
+        title('PSTH: mean ± SEM, cluster-corrected ranksum test');
         box off
 
-        pdfName = sprintf('%s_%s_ch%d_unit%d.pdf', ...
+        pdfName = sprintf('%s_%s_ch%d_unit%d_totalReward_clusterPerm.pdf', ...
             ptID, areaNameClean, chanNum, unitNum);
 
         pdfPath = fullfile(OutputFolder, pdfName);
